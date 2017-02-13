@@ -11,8 +11,30 @@ namespace Send
     {
         static void Main(string[] args)
         {
-            WorkQueue();
-            
+            PublishSubscribe();
+        }
+
+        private static void PublishSubscribe()
+        {
+            Console.WriteLine(" Press [Ctrl + C] to exit.");
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using (var connection = factory.CreateConnection())
+            using (var channel = connection.CreateModel())
+            {
+                channel.ExchangeDeclare(exchange: "logs", type: "fanout");  // 创建exchange
+
+                while (true)
+                {
+                    var message = "hello world";
+                    var body = Encoding.UTF8.GetBytes(message);
+                    channel.BasicPublish(exchange: "logs",      // 根据exchange发送
+                                         routingKey: "",
+                                         basicProperties: null,
+                                         body: body);
+                    Console.WriteLine(" [x] Sent {0}", message);
+                    Console.ReadLine();
+                }
+            }
         }
 
         /// <summary>

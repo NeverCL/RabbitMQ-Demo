@@ -13,8 +13,40 @@ namespace Receive
     {
         static void Main(string[] args)
         {
-           
+            PublishSubscribe();
         }
+
+        private static void PublishSubscribe()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using (var connection = factory.CreateConnection())
+            using (var channel = connection.CreateModel())
+            {
+                channel.ExchangeDeclare(exchange: "logs", type: "fanout");
+
+                var queueName = channel.QueueDeclare().QueueName;   // 新建临时队列,提出自动删除该队列
+                channel.QueueBind(queue: queueName,                 // 绑定queue和exchange
+                                  exchange: "logs",
+                                  routingKey: "");
+
+                Console.WriteLine(" [*] Waiting for logs.");
+
+                var consumer = new EventingBasicConsumer(channel);
+                consumer.Received += (model, ea) =>
+                {
+                    var body = ea.Body;
+                    var message = Encoding.UTF8.GetString(body);
+                    Console.WriteLine(" [x] {0}", message);
+                };
+                channel.BasicConsume(queue: queueName,
+                                     noAck: true,
+                                     consumer: consumer);
+
+                Console.WriteLine(" Press [enter] to exit.");
+                Console.ReadLine();
+            }
+        }
+
 
         /// <summary>
         /// 消息确认 消息分配
