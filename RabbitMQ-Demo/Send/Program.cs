@@ -11,9 +11,40 @@ namespace Send
     {
         static void Main(string[] args)
         {
-            PublishSubscribe();
+            Routing();
         }
 
+        /// <summary>
+        /// Routing
+        /// </summary>
+        private static void Routing()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using (var connection = factory.CreateConnection())
+            using (var channel = connection.CreateModel())
+            {
+                channel.ExchangeDeclare(exchange: "direct_logs", type: "direct");   // 此处为direct
+
+                while (true)
+                {
+                    var severity = Console.ReadLine();
+                    var message = "Hello World:" + severity;
+                    var body = Encoding.UTF8.GetBytes(message);
+                    channel.BasicPublish(
+                        exchange: "direct_logs",
+                        routingKey: severity,           // 发送到指定的路由键
+                        basicProperties: null,
+                        body: body);
+                    Console.WriteLine(" [x] Sent '{0}':'{1}'", severity, message);
+                    Console.ReadLine();
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Publish发布
+        /// </summary>
         private static void PublishSubscribe()
         {
             Console.WriteLine(" Press [Ctrl + C] to exit.");
@@ -21,7 +52,7 @@ namespace Send
             using (var connection = factory.CreateConnection())
             using (var channel = connection.CreateModel())
             {
-                channel.ExchangeDeclare(exchange: "logs", type: "fanout");  // 创建exchange
+                channel.ExchangeDeclare(exchange: "logs", type: ExchangeType.Fanout);  // 创建exchange,type内置不可任意
 
                 while (true)
                 {
