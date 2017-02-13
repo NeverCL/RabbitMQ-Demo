@@ -11,7 +11,43 @@ namespace Send
     {
         static void Main(string[] args)
         {
-            HelloWorld();
+            WorkQueue();
+            
+        }
+
+        /// <summary>
+        /// 持久化
+        /// </summary>
+        private static void WorkQueue()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            using (var connection = factory.CreateConnection())
+            {
+                using (var channel = connection.CreateModel())
+                {
+                    channel.QueueDeclare(queue: "workQueue",
+                                durable: true,              // 持久化,不能直接更改已经存在的队列
+                                exclusive: false,
+                                autoDelete: false,
+                                arguments: null);
+
+                    var prop = channel.CreateBasicProperties();
+                    prop.Persistent = true;                 // 持久化
+
+                    while (true)
+                    {
+                        string message = "Hello World!" + DateTime.Now;
+                        var body = Encoding.UTF8.GetBytes(message);
+
+                        channel.BasicPublish(exchange: "",
+                                             routingKey: "workQueue",
+                                             basicProperties: null,
+                                             body: body);
+                        Console.WriteLine(" [x] Sent {0}", message);
+                        Console.ReadLine();
+                    }
+                }
+            }
         }
 
         private static void HelloWorld()
@@ -27,7 +63,6 @@ namespace Send
                                 exclusive: false,
                                 autoDelete: false,
                                 arguments: null);
-
                     while (true)
                     {
                         string message = "Hello World!" + DateTime.Now;
