@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Framing;
 
 namespace Send
 {
@@ -113,23 +109,32 @@ namespace Send
         {
             var factory = new ConnectionFactory
             {
-                HostName = hostName,
+                HostName = hostName,                // rabbit server
                 UserName = "admin",
                 Password = "admin",
-                Port = 5672,
-                VirtualHost = "/"            // 虚拟Host,需提前配置
+                Port = 5672,                        // Broker端口
+                VirtualHost = "/"                   // 虚拟Host,需提前配置
             };
 
             using (var connection = factory.CreateConnection()) // 创建与服务器的连接
             {
                 using (var channel = connection.CreateModel()) // 创建1个通道,大部分API在该channel中
                 {
-                    // 定义1个队列
-                    channel.QueueDeclare(queue: "hello",    // 队列名称
-                        durable: false,                     // 是否持久化
-                        exclusive: false,
-                        autoDelete: false,
+                    // 定义1个队列,默认会和默认的exchange 做direct绑定
+                    channel.QueueDeclare(queue: "hello",   // 队列名称
+                        durable: true,                      // 是否持久化
+                        exclusive: false,                   // 排他队列:如果一个队列被声明为排他队列，该队列仅对首次声明它的连接可见，并在连接断开时自动删除。
+                        autoDelete: false,                  // 自动删除:当最后一个消费者取消订阅时，队列自动删除。如果您需要仅由一个使用者使用的临时队列，请将自动删除与排除。当消费者断​​开连接时，队列将被删除。
                         arguments: null);
+
+                    channel.ExchangeDeclare("test",ExchangeType.Direct);    // 定义exchange
+                    channel.ExchangeDeclare("puball",ExchangeType.Fanout);    // 定义exchange
+
+                    var queueName = channel.QueueDeclare().QueueName;   // 定义随机的队列
+
+                    channel.QueueBind("hello","test","hello");
+                    channel.QueueBind("hello","puball","hello");
+                    channel.QueueBind("hello2", "puball", "hello1");
 
                     var properties = channel.CreateBasicProperties();
                     properties.Persistent = true;
@@ -139,10 +144,11 @@ namespace Send
                         string message = "Hello World!" + DateTime.Now;
                         var body = Encoding.UTF8.GetBytes(message);
 
-                        channel.BasicPublish(exchange: "", // 发送消息到队列中
-                            routingKey: "hello",
-                            basicProperties: properties,
-                            body: body); // 发送的是bytes 可以任意编码
+                        // 发送消息到队列中
+                        channel.BasicPublish(exchange: "puball", // 传递为Empty的时候,通过	`(AMQP default)`传递
+                            routingKey: "hello",            // routing key 与 queuebind中的binding key对应
+                            basicProperties: properties,    // 消息header
+                            body: body);                    // 消息body:发送的是bytes 可以任意编码
 
                         Console.WriteLine(" [x] Sent {0}", message);
                         Thread.Sleep(1000);
